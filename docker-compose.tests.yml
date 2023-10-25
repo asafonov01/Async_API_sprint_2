@@ -1,0 +1,92 @@
+version: '3.9'
+
+volumes:
+  es_volume_test:
+  redis_volume_test:
+
+services:
+  redis_test:
+    image: 'redis:6.2.6'
+    container_name: redis_test
+    volumes:
+      - redis_volume_test:/usr/local/etc/redis/redis.conf
+    env_file:
+      - .test.env
+    expose:
+      - ${REDIS_PORT}
+    ports:
+      - "${REDIS_PORT}:${REDIS_PORT}"
+    healthcheck:
+      test: [ "CMD", "redis-cli", "--raw", "incr", "ping" ]
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "200k"
+        max-file: "10"
+
+  elastic_test:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.7.0
+    container_name: elastic_test
+    environment:
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    env_file:
+      - .test.env
+    volumes:
+      - es_volume_test:/usr/share/elasticsearch/data
+    expose:
+      - ${ELASTIC_PORT}
+    ports:
+      - "${ELASTIC_PORT}:${ELASTIC_PORT}"
+    healthcheck:
+      test: [ "CMD-SHELL", "curl --silent --fail ${ELASTIC_HOST}:${ELASTIC_PORT}/_cluster/health || exit 1" ]
+      interval: 30s
+      timeout: 30s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "200k"
+        max-file: "10"
+
+  es_init_test:
+    image: curlimages/curl:7.79.1
+    container_name: es_init_test
+    entrypoint: [ "sh", "/home/curl_user/curl_entrypoint.sh" ]
+    env_file:
+      - .test.env
+    volumes:
+      - ./etl/index/movies.json:/home/curl_user/movies.json
+      - ./etl/index/genres.json:/home/curl_user/genres.json
+      - ./etl/index/persons.json:/home/curl_user/persons.json
+      - ./tests/utils/curl_entrypoint.sh:/home/curl_user/curl_entrypoint.sh
+#    depends_on:
+#      elastic_test:
+#        condition: service_healthy
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "200k"
+        max-file: "10"
+
+  fastapi_app_test:
+    build:
+      context: .
+      dockerfile: src/Dockerfile
+    container_name: fastapi_app_test
+    restart: on-failure
+    ports:
+      - "8000:8000"
+    depends_on:
+      elastic_test:
+        condition: service_healthy
+      redis_test:
+        condition: service_healthy
+    env_file:
+      - .test.env
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "200k"
+        max-file: "10"
