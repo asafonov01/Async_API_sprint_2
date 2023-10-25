@@ -1,6 +1,7 @@
 import json
 import logging
 import time
+from contextlib import asynccontextmanager
 
 import aioredis
 import uvicorn
@@ -24,8 +25,9 @@ app = FastAPI(
 )
 
 
-@app.on_event("startup")
-async def startup():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    FastAPI(lifespan=lifespan)
     redis.redis = await aioredis.Redis(
         host=config.REDIS_HOST, port=config.REDIS_PORT)
 
@@ -36,7 +38,6 @@ async def startup():
 
 @app.on_event("shutdown")
 async def shutdown():
-    # Отключаемся от баз при выключении сервера
     await redis.redis.close()
     await elastic.es.close()
 

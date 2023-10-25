@@ -65,7 +65,6 @@ def make_get_request(session):
 
     async def inner(url: str, params: dict = None) -> HTTPResponse:
         params = params or {}
-        print(url, params)
         async with session.get(url, params=params) as response:
             return HTTPResponse(
                 body=await response.json(),
@@ -84,7 +83,7 @@ def delete_es_docs(es_client: AsyncElasticsearch):
         :param index: Имя индекса в Elasticsearch.
         :param data: UUID документа или Список UUID документов.
         """
-        if type(data) is list:
+        if isinstance(object, list):
             bulk_body = [
                 {'delete': {'_index': index, '_id': x}} for x in data]
             await es_client.bulk(body=bulk_body)
@@ -182,11 +181,3 @@ def make_get_es_index_all_id(es_client: AsyncElasticsearch):
         return [x['_id'] for x in response['hits']['hits']]
 
     return inner
-
-
-@pytest.fixture(scope='session')
-def event_loop():
-    """Create an instance of the default event loop for each test case."""
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    yield loop
-    loop.close()
